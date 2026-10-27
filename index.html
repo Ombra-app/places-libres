@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Places libres">
+<meta name="theme-color" content="#f3f5f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121614" media="(prefers-color-scheme: dark)">
+<title>Places libres Nantes Rennes</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Panneau de jalonnement : grandes valeurs condensées façon afficheur, carte au-dessus, liste dessous */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --fg:#17201b; --muted:#5b6a62; --line:#dbe2de;
+  --accent:#1f5fd1;
+  --ok:#14804a; --mid:#c27a00; --low:#c8321e; --off:#8a948f;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#121614; --surface:#1b211e; --fg:#e8eeea; --muted:#9aa8a0; --line:#2b3430;
+  --accent:#6ea0ff; --ok:#3ccf82; --mid:#f2b23c; --low:#ff6a55; --off:#6f7a74; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 var(--body);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{padding-block:14px 10px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+h1{font:700 1.7rem/1 var(--display);letter-spacing:.01em;margin:0;text-wrap:balance}
+h1 span{color:var(--accent)}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg button{border:0;background:none;color:var(--muted);font:600 .95rem var(--body);padding:7px 14px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.layout{display:grid;gap:14px;padding-bottom:24px}
+@media (min-width:900px){.layout{grid-template-columns:1.2fr 1fr;align-items:start}#map{position:sticky;top:12px;height:calc(100vh - 110px)!important}}
+#map{height:42vh;min-height:260px;border-radius:14px;border:1px solid var(--line);background:var(--surface)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;color:var(--muted);font-size:.85rem;margin-bottom:8px}
+.bar button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 .85rem var(--body);padding:6px 12px;border-radius:999px;cursor:pointer}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button[aria-pressed="true"]{border-color:var(--fg)}
+ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+li{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:2px 12px;cursor:pointer}
+li:hover{border-color:var(--muted)}
+.name{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.meta{color:var(--muted);font-size:.8rem;display:flex;gap:8px;flex-wrap:wrap}
+.pill{font-size:.72rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.free{grid-row:span 2;text-align:right;align-self:center;font:700 2rem/1 var(--display);font-variant-numeric:tabular-nums}
+.free small{display:block;font:500 .72rem var(--body);color:var(--muted)}
+.gauge{grid-column:1/-1;height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:6px}
+.gauge i{display:block;height:100%}
+.c-ok{color:var(--ok)}.c-mid{color:var(--mid)}.c-low{color:var(--low)}.c-off{color:var(--off)}
+.b-ok{background:var(--ok)}.b-mid{background:var(--mid)}.b-low{background:var(--low)}.b-off{background:var(--off)}
+.stale{color:var(--mid)}
+.note{color:var(--muted);font-size:.78rem;margin-top:14px}
+.note a{color:var(--accent)}
+.err{background:var(--surface);border:1px solid var(--low);border-radius:10px;padding:8px 12px;font-size:.85rem;margin-bottom:8px}
+.pin{font:700 13px/1 var(--display);color:#fff;border-radius:6px;padding:4px 5px;text-align:center;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);white-space:nowrap}
+.leaflet-container{font:inherit}
+.leaflet-popup-content{margin:10px 12px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Places <span>libres</span></h1>
+    <div class="seg" role="group" aria-label="Ville">
+      <button id="city-nantes" data-city="nantes" aria-pressed="true">Nantes</button>
+      <button id="city-rennes" data-city="rennes" aria-pressed="false">Rennes</button>
+    </div>
+  </header>
+  <div class="layout">
+    <div id="map" aria-label="Carte des parkings"></div>
+    <section>
+      <div class="bar">
+        <div class="filters" role="group" aria-label="Type">
+          <button id="f-all" data-f="all" aria-pressed="true">Tous</button>
+          <button id="f-centre" data-f="centre" aria-pressed="false">Parkings</button>
+          <button id="f-pr" data-f="pr" aria-pressed="false">Parcs relais</button>
+        </div>
+        <button id="locate">Trier par distance</button>
+      </div>
+      <div id="status" class="bar"></div>
+      <div id="errors"></div>
+      <ul id="list"></ul>
+      <p class="note">Données ouvertes : Nantes Métropole (parkings publics et parcs relais), Citédia (parkings du centre de Rennes), STAR (parcs relais de Rennes). Licence ODbL. Une valeur de plus de 15 minutes est signalée comme ancienne. Les parkings privés hors délégation publique ne sont pas couverts.</p>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const SRC = {
+  nantesCentre: 'https://data.nantesmetropole.fr/api/explore/v2.1/catalog/datasets/244400404_parkings-publics-nantes-disponibilites/records?limit=100',
+  nantesPR: 'https://data.nantesmetropole.fr/api/explore/v2.1/catalog/datasets/244400404_parcs-relais-nantes-metropole-disponibilites/records?limit=100',
+  rennesPR: 'https://data.rennesmetropole.fr/api/explore/v2.1/catalog/datasets/tco-parcsrelais-star-etat-tr/records?limit=100',
+  rennesCentre: 'data/citedia.json'
+};
+// Positions des parkings Citédia (jeu « export-api-parking-citedia », Rennes Métropole)
+const CITEDIA_POS = {
+  'colombier':[48.104763,-1.678625,'Colombier'], 'gare-sud':[48.102176,-1.672786,'Gare Sud'],
+  'dinan-chezy':[48.113662,-1.686106,'Chézy-Dinan'], 'hoche':[48.115237,-1.677049,'Hoche'],
+  'kennedy':[48.120830,-1.709769,'Kennedy'], 'lices':[48.112674,-1.683072,'Lices'],
+  'charles-de-gaulle':[48.106235,-1.676050,'Charles de Gaulle'], 'hotel-dieu':[48.118084,-1.680472,'Hôtel-Dieu'],
+  'kleber':[48.110784,-1.673618,'Kléber'], 'arsenal':[48.105092,-1.686123,'Arsenal']
+};
+const CENTER = {nantes:[47.2135,-1.5536,13], rennes:[48.1110,-1.6800,13]};
+const STALE_MIN = 15;
+
+let state = {city:'nantes', filter:'all', parks:[], me:null};
+try{ const s=JSON.parse(localStorage.getItem('pl-prefs')||'{}'); if(s.city) state.city=s.city; if(s.filter) state.filter=s.filter; }catch(e){}
+const save=()=>{try{localStorage.setItem('pl-prefs',JSON.stringify({city:state.city,filter:state.filter}))}catch(e){}};
+
+const title = s => s ? s.toLowerCase().replace(/(^|[\s\-'(])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase()).replace(/\bP\+r\b/i,'P+R') : s;
+const getJSON = async u => { const r = await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error(r.status); return r.json(); };
+const pt = g => g ? (Array.isArray(g)?{lat:g[0],lon:g[1]}:{lat:g.lat,lon:g.lon}) : null;
+
+function nantes(rows, kind){
+  return rows.map(r=>{
+    const p=pt(r.location); const st=r.grp_statut;
+    const open = st===5;
+    return {id:'n'+kind+r.grp_identifiant, city:'nantes', kind, name:title(r.nom_complet||r.grp_nom), addr:r.adresse||'',
+      lat:p?.lat, lon:p?.lon, free: open ? r.grp_disponible : null, cap:r.grp_exploitation,
+      status: st===1?'Fermé': st===2?'Abonnés seulement': st===0?'Comptage hors service':'',
+      full: open && r.grp_disponible<=r.grp_complet, ts:r.grp_horodatage};
+  });
+}
+function star(rows){
+  return rows.map(r=>{
+    const p=pt(r.coordonnees); const open=r.etatouverture==='OUVERT';
+    return {id:'s'+r.idparc, city:'rennes', kind:'pr', name:'P+R '+r.nom, addr:'Réseau STAR',
+      lat:p?.lat, lon:p?.lon, free: open ? r.jrdinfosoliste : null, cap:r.capacitesoliste,
+      status: open?'':'Fermé', full: r.etatremplissage==='COMPLET', ts:r.lastupdate,
+      extra:[r.jrdinfoelectrique!=null?`${r.jrdinfoelectrique} élec.`:'', r.jrdinfopmr!=null?`${r.jrdinfopmr} mobilité réduite`:''].filter(Boolean).join(' · ')};
+  });
+}
+function citedia(j){
+  const parks=j.parks||{};
+  return Object.entries(parks).map(([k,v])=>{
+    const pos=CITEDIA_POS[k]||[null,null,title(k.replace(/-/g,' '))];
+    const open=v.status==='AVAILABLE'||v.status==='FULL';
+    return {id:'c'+k, city:'rennes', kind:'centre', name:pos[2], addr:'Citédia', lat:pos[0], lon:pos[1],
+      free: open ? v.free : null, cap:v.max, status: open?'':'Fermé', full:v.status==='FULL'||v.free===0, ts:j.fetched_at};
+  });
+}
+
+function level(p){
+  if(p.free==null) return 'off';
+  if(p.full || p.free===0) return 'low';
+  const r = p.cap ? p.free/p.cap : 1;
+  return r<0.1?'low': r<0.3?'mid':'ok';
+}
+function age(ts){ if(!ts) return null; return (Date.now()-new Date(ts).getTime())/60000; }
+function ago(m){ if(m==null) return 'heure inconnue'; if(m<1) return "à l'instant"; if(m<60) return `il y a ${Math.round(m)} min`; const h=m/60; return h<24?`il y a ${Math.round(h)} h`:`il y a ${Math.round(h/24)} j`; }
+function dist(p){ if(!state.me||p.lat==null) return null; const R=6371, toR=x=>x*Math.PI/180;
+  const dLa=toR(p.lat-state.me.lat), dLo=toR(p.lon-state.me.lon);
+  const a=Math.sin(dLa/2)**2+Math.cos(toR(state.me.lat))*Math.cos(toR(p.lat))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(a)); }
+
+// Carte
+const map = L.map('map',{zoomControl:true,attributionControl:true});
+const dark = matchMedia('(prefers-color-scheme: dark)');
+let tiles;
+function setTiles(){ if(tiles) map.removeLayer(tiles);
+  tiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark.matches?'dark_all':'light_all'}/{z}/{x}/{y}{r}.png`,
+    {maxZoom:19, attribution:'© OpenStreetMap, © CARTO'}).addTo(map); }
+setTiles(); dark.addEventListener?.('change',setTiles);
+const layer = L.layerGroup().addTo(map); let meMarker=null; const markers={};
+
+function visible(){ return state.parks.filter(p=>p.city===state.city && (state.filter==='all'||p.kind===state.filter)); }
+
+function render(){
+  const css=getComputedStyle(document.documentElement);
+  const col=l=>css.getPropertyValue('--'+l).trim();
+  const list=document.getElementById('list'); list.textContent='';
+  layer.clearLayers();
+  let items=visible();
+  items.forEach(p=>p.d=dist(p));
+  items.sort((a,b)=> state.me ? (a.d??1e9)-(b.d??1e9) : ((b.free??-1)-(a.free??-1)));
+  for(const p of items){
+    const lv=level(p), m=age(p.ts), stale=m!=null&&m>STALE_MIN;
+    const li=document.createElement('li');
+    const pct = p.cap&&p.free!=null ? Math.max(2,Math.round(100*p.free/p.cap)) : 0;
+    li.innerHTML=`<div class="name"></div>
+      <div class="free c-${lv}">${p.free==null?'–':p.free}<small>${p.free==null?(p.status||'indisponible'):`sur ${p.cap??'?'}`}</small></div>
+      <div class="meta"><span class="pill">${p.kind==='pr'?'Parc relais':'Parking'}</span>${p.d!=null?`<span>${p.d<1?Math.round(p.d*1000)+' m':p.d.toFixed(1).replace('.',',')+' km'}</span>`:''}<span class="${stale?'stale':''}">${stale?'Donnée ancienne, ':''}${ago(m)}</span>${p.extra?`<span>${p.extra}</span>`:''}</div>
+      <div class="gauge"><i class="b-${lv}" style="width:${pct}%"></i></div>`;
+    li.querySelector('.name').textContent=p.name;
+    li.onclick=()=>{ if(p.lat!=null){ map.setView([p.lat,p.lon],16); markers[p.id]?.openPopup(); document.getElementById('map').scrollIntoView({behavior:'smooth',block:'start'});} };
+    list.appendChild(li);
+    if(p.lat!=null){
+      const icon=L.divIcon({className:'',html:`<div class="pin" style="background:${col(lv)};opacity:${stale?.55:1}">${p.free==null?'×':p.free}</div>`,iconSize:null});
+      const mk=L.marker([p.lat,p.lon],{icon}).addTo(layer);
+      const pop=document.createElement('div');
+      const b=document.createElement('b'); b.textContent=p.name; pop.appendChild(b);
+      pop.appendChild(document.createElement('br'));
+      pop.appendChild(document.createTextNode(p.free==null?(p.status||'Indisponible'):`${p.free} places libres sur ${p.cap}`));
+      pop.appendChild(document.createElement('br'));
+      const a=document.createElement('a'); a.href=`https://maps.apple.com/?daddr=${p.lat},${p.lon}`; a.target='_blank'; a.rel='noopener'; a.textContent='Itinéraire';
+      pop.appendChild(a);
+      mk.bindPopup(pop); markers[p.id]=mk;
+    }
+  }
+  if(!items.length) list.innerHTML='<li style="cursor:default"><div class="name">Aucune donnée pour le moment</div><div class="meta">Les flux se rechargent toutes les minutes.</div></li>';
+  const tot=items.reduce((s,p)=>s+(p.free||0),0);
+  document.getElementById('status').textContent=`${items.length} parking${items.length>1?'s':''} · ${tot.toLocaleString('fr-FR')} place${tot>1?'s':''} libre${tot>1?'s':''} · actualisé à ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`;
+}
+
+function setCity(c, recenter=true){
+  state.city=c; save();
+  document.querySelectorAll('[data-city]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.city===c));
+  if(recenter){ const z=CENTER[c]; map.setView([z[0],z[1]],z[2]); }
+  render();
+}
+document.querySelectorAll('[data-city]').forEach(b=>b.onclick=()=>setCity(b.dataset.city));
+document.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ state.filter=b.dataset.f; save();
+  document.querySelectorAll('[data-f]').forEach(x=>x.setAttribute('aria-pressed',x===b)); render(); });
+document.querySelectorAll('[data-f]').forEach(x=>x.setAttribute('aria-pressed',x.dataset.f===state.filter));
+
+document.getElementById('locate').onclick=()=>{
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(pos=>{
+    state.me={lat:pos.coords.latitude,lon:pos.coords.longitude};
+    const dN=Math.hypot(state.me.lat-CENTER.nantes[0],state.me.lon-CENTER.nantes[1]);
+    const dR=Math.hypot(state.me.lat-CENTER.rennes[0],state.me.lon-CENTER.rennes[1]);
+    setCity(dN<dR?'nantes':'rennes',false);
+    if(meMarker) map.removeLayer(meMarker);
+    meMarker=L.circleMarker([state.me.lat,state.me.lon],{radius:7,color:'#fff',weight:2,fillColor:getComputedStyle(document.documentElement).getPropertyValue('--accent'),fillOpacity:1}).addTo(map);
+    map.setView([state.me.lat,state.me.lon],14);
+  },()=>{ document.getElementById('errors').innerHTML='<div class="err">Position refusée. Autorise la localisation pour ce site dans les réglages de Safari.</div>'; },{enableHighAccuracy:true,timeout:10000});
+};
+
+async function load(){
+  const jobs=[
+    ['Nantes, parkings', ()=>getJSON(SRC.nantesCentre).then(j=>nantes(j.results,'centre'))],
+    ['Nantes, parcs relais', ()=>getJSON(SRC.nantesPR).then(j=>nantes(j.results,'pr'))],
+    ['Rennes, parcs relais STAR', ()=>getJSON(SRC.rennesPR).then(j=>star(j.results))],
+    ['Rennes, parkings Citédia', ()=>getJSON(SRC.rennesCentre+'?t='+Date.now()).then(citedia)]
+  ];
+  const res=await Promise.allSettled(jobs.map(j=>j[1]()));
+  const fails=[]; const parks=[];
+  res.forEach((r,i)=>{ if(r.status==='fulfilled') parks.push(...r.value); else fails.push(jobs[i][0]); });
+  if(parks.length) state.parks=parks;
+  const e=document.getElementById('errors'); e.textContent='';
+  if(fails.length){ const d=document.createElement('div'); d.className='err'; d.textContent='Flux injoignable : '+fails.join(', ')+'. Nouvel essai dans une minute.'; e.appendChild(d); }
+  render();
+}
+setCity(state.city);
+load(); setInterval(load,60000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) load(); });
+</script>
+</body>
+</html>
