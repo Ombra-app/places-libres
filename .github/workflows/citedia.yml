@@ -1,0 +1,40 @@
+name: Relais Citédia
+
+# Le flux Citédia (parkings du centre de Rennes) n'existe qu'en http,
+# donc illisible depuis une page https. Ce job le recopie dans data/citedia.json.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: citedia
+  cancel-in-progress: true
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Récupérer le flux
+        run: |
+          set -e
+          curl -sf --max-time 20 http://data.citedia.com/r1/parks/status -o /tmp/raw.json
+          python3 - <<'EOF'
+          import json, datetime
+          raw = json.load(open('/tmp/raw.json'))
+          out = {"fetched_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+                 "source": "http://data.citedia.com/r1/parks/status",
+                 "parks": raw}
+          json.dump(out, open('data/citedia.json', 'w'), ensure_ascii=False)
+          EOF
+      - name: Publier
+        run: |
+          git config user.name "relais-citedia"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/citedia.json
+          git commit -m "Citédia $(date -u +%H:%M)" || exit 0
+          git push
